@@ -6,6 +6,7 @@ from app.models.transcoding import TranscodingJob
 from app.domain.downloader import MediaDownloader
 from app.domain.transcoder import FfmpegTranscoder
 from app.domain.webhook import send_job_webhook
+from app.domain.uploader import CloudUploader
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +72,12 @@ class VideoTranscodingTask(Task):
         job.update_status(TranscodingJob.Status.PACKAGING)
 
     def upload_final_artifacts(self, job, work_dir):
-        # TODO: Implement uploading artifacts to cloud storage
         job.update_status(TranscodingJob.Status.UPLOADING)
+        CloudUploader().upload_directory(
+            source_dir=work_dir,
+            destination_path=job.output_path,
+            credentials=job.storage_config
+        )
 
     def cleanup_workspace(self, work_dir):
         shutil.rmtree(work_dir, ignore_errors=True)
