@@ -4,7 +4,7 @@ import logging
 from celery import shared_task, Task
 from app.models.transcoding import TranscodingJob
 from app.domain.downloader import MediaDownloader
-from app.domain.transcoder import FfmpegTranscoder
+from app.domain.transcoder import FFmpegTranscoder
 from app.domain.webhook import send_job_webhook
 from app.domain.uploader import CloudUploader
 
@@ -55,7 +55,7 @@ class VideoTranscodingTask(Task):
             outputs = [{'height': 360, 'width': 640, 'name': '360p'}]
             
         transcoded_streams = []
-        transcoder = FfmpegTranscoder()
+        transcoder = FFmpegTranscoder()
         for out in outputs:
             name = out.get('name') or f"{out['height']}p"
             width = out.get('width', 640)
