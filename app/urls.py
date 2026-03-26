@@ -16,7 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from app.views.transcoding import TranscodingTriggerView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/v1/transcode/trigger/', TranscodingTriggerView.as_view(), name='transcoding-trigger'),
 ]

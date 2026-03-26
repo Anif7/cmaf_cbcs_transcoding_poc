@@ -20,5 +20,18 @@ class TranscodingJob(TimeStampedModel):
     status = models.PositiveIntegerField(choices=Status.choices, default=Status.QUEUED)
     error_message = models.TextField(blank=True, null=True)
 
+    def update_status(self, status):
+        self.status = status
+        self.save(update_fields=['status'])
+
+    def mark_as_completed(self):
+        self.status = self.Status.COMPLETED
+        self.save(update_fields=['status'])
+
+    def mark_as_failed(self, error_message):
+        self.status = self.Status.FAILED
+        self.error_message = error_message
+        self.save(update_fields=['status', 'error_message'])
+
     def __str__(self):
         return f"Job {self.id} - {self.get_status_display()}"
