@@ -6,7 +6,7 @@ To ensure high-quality and maintainable code, all development in this repository
 - **Single Responsibility Principle (SRP)**: Each class, module, and function should have one, and only one, reason to change. Extract complex logic into dedicated helper methods or classes.
 - **Level of Abstraction**: Maintain consistent levels of abstraction within a single function or class. High-level policy should be decoupled from low-level implementation details.
 - **Better Naming**: Use intent-revealing names for variables, functions, and classes. Avoid generic names like `data`, `process`, or `handler` without specific context.
-- **No Redundant Comments & Docstrings**: Code should be self-documenting. Avoid redundant comments that explain *what* the code is doing. Only use comments to explain the *why* behind non-obvious design decisions.
+- **Minimize Comments & Docstrings**: Do not include unnecessary comments or docstrings. Only include them if the task is critical or the logic is not easily understandable. Code should be self-explanatory.
 
 ## 2. Structural Patterns
 - **Domain Layer (`app/domain/`)**: All business logic and external tool orchestration (FFmpeg, Shaka, Rclone) must reside here. This layer should be independent of frameworks (Django/FastAPI) where possible.
