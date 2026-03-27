@@ -7,6 +7,7 @@ from app.domain.downloader import MediaDownloader
 from app.domain.transcoder import FFmpegTranscoder
 from app.domain.webhook import send_job_webhook
 from app.domain.uploader import CloudUploader
+from app.domain.packager import ShakaPackager
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ class VideoTranscodingTask(Task):
     name = 'app.tasks.transcoding.video_transcoding_task'
 
     def run(self, job_id, *args, **kwargs):
+        logger.info(f"Starting VideoTranscodingTask for Job {job_id}")
         try:
             job = TranscodingJob.objects.get(id=job_id)
         except TranscodingJob.DoesNotExist:
@@ -33,12 +35,20 @@ class VideoTranscodingTask(Task):
             self.cleanup_workspace(work_dir)
 
     def execute_pipeline(self, job, work_dir):
+        logger.info(f"Step 1/4: Downloading source media for Job {job.id}")
         source_file = self.download_source_media(job, work_dir)
+        
+        logger.info(f"Step 2/4: Transcoding Job {job.id}")
         transcoded_streams = self.transcode_to_specified_formats(job, work_dir, source_file)
+        
+        logger.info(f"Step 3/4: Packaging Job {job.id} (Multi-DRM CMAF)")
         self.package_transcoded_streams(job, work_dir, transcoded_streams)
+        
+        logger.info(f"Step 4/4: Uploading Job {job.id} to cloud storage")
         self.upload_final_artifacts(job, work_dir)
         
         job.mark_as_completed()
+        logger.info(f"Successfully completed Job {job.id}")
         send_job_webhook(job)
 
     def download_source_media(self, job, work_dir):
@@ -68,18 +78,25 @@ class VideoTranscodingTask(Task):
         return transcoded_streams
 
     def package_transcoded_streams(self, job, work_dir, transcoded_streams):
-        # TODO: Implement packaging unified ABR CMAF/CBCS
         job.update_status(TranscodingJob.Status.PACKAGING)
+        output_dir = os.path.join(work_dir, 'packaged')
+        ShakaPackager().package(transcoded_streams, output_dir, job.drm_config)
 
     def upload_final_artifacts(self, job, work_dir):
         job.update_status(TranscodingJob.Status.UPLOADING)
+        destination = job.output_path
+        storage_config = job.storage_config.get('output', {})
+        logger.info(f"Uploading artifacts to: {destination}")
         CloudUploader().upload_directory(
-            source_dir=work_dir,
-            destination_path=job.output_path,
-            credentials=job.storage_config
+            source_dir=os.path.join(work_dir, 'packaged'),
+            destination_path=destination,
+            credentials=storage_config
         )
 
     def cleanup_workspace(self, work_dir):
+        logger.info(f"Cleaning up workspace: {work_dir}")
         shutil.rmtree(work_dir, ignore_errors=True)
 
-video_transcoding_task = shared_task(bind=True, base=VideoTranscodingTask)(lambda self, *args, **kwargs: self.run(*args, **kwargs))
+@shared_task(bind=True, base=VideoTranscodingTask)
+def video_transcoding_task(self, *args, **kwargs):
+    return VideoTranscodingTask.run(self, *args, **kwargs)

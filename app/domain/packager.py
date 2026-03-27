@@ -1,0 +1,95 @@
+import os
+import subprocess
+import logging
+from typing import Dict, List
+
+logger = logging.getLogger(__name__)
+
+class ShakaPackager:
+    def package(self, stream_inputs: List[Dict], output_dir: str, drm_config: Dict) -> None:
+        logger.info(f"Starting packaging with DRM config: {drm_config}")
+        os.makedirs(output_dir, exist_ok=True)
+        self._validate_drm_config(drm_config)
+        
+        command = self._build_command(stream_inputs, output_dir, drm_config)
+        self._execute_packager(command, output_dir)
+
+    def _validate_drm_config(self, drm_config: Dict) -> None:
+        fairplay = drm_config.get('fairplay', {})
+        widevine = drm_config.get('widevine', {})
+        
+        key = fairplay.get('key') or widevine.get('key')
+        key_id = fairplay.get('content_id') or widevine.get('content_id')
+        
+        if not key or not key_id:
+            logger.error(f"Invalid DRM config. Key found: {bool(key)}, KeyID found: {bool(key_id)}")
+            raise ValueError("DRM configuration requires key and content_id (key_id)")
+
+    def _build_command(self, stream_inputs: List[Dict], output_dir: str, drm_config: Dict) -> List[str]:
+        fairplay = drm_config.get('fairplay', {})
+        widevine = drm_config.get('widevine', {})
+        
+        key = fairplay.get('key') or widevine.get('key')
+        key_id = fairplay.get('content_id') or widevine.get('content_id')
+        iv = fairplay.get('iv') or widevine.get('iv')
+        key_uri = fairplay.get('uri')
+
+        command = ['packager']
+        
+        # Audio
+        audio_dir = os.path.join(output_dir, 'audio')
+        os.makedirs(audio_dir, exist_ok=True)
+        highest_quality_stream = stream_inputs[-1]['path']
+        
+        command.append(
+            f"input={highest_quality_stream},"
+            f"stream=audio,"
+            f"init_segment=audio/audio_init.m4s,"
+            f"segment_template=audio/audio_$Number$.m4s,"
+            f"playlist_name=audio/audio.m3u8,"
+            f"drm_label=default"
+        )
+
+        # Video
+        for stream in stream_inputs:
+            path = stream['path']
+            res_name = stream['name']
+            
+            res_dir = os.path.join(output_dir, res_name)
+            os.makedirs(res_dir, exist_ok=True)
+
+            command.append(
+                f"input={path},"
+                f"stream=video,"
+                f"init_segment={res_name}/video_init.m4s,"
+                f"segment_template={res_name}/video_$Number$.m4s,"
+                f"playlist_name={res_name}/video_v.m3u8,"
+                f"drm_label=default"
+            )
+
+        command.extend([
+            '--enable_raw_key_encryption',
+            f'--keys=label=default:key_id={key_id}:key={key}',
+            '--protection_scheme', 'cbcs',
+            '--protection_systems', 'Widevine,FairPlay',
+            '--segment_duration', '2',
+            '--clear_lead', '1',
+            '--hls_master_playlist_output', 'video.m3u8',
+            '--hls_playlist_type', 'VOD',
+            '--mpd_output', 'video.mpd',
+            '--generate_static_live_mpd',
+        ])
+        
+        if iv:
+            command.extend(['--iv', iv])
+        if key_uri:
+            command.extend(['--hls_key_uri', key_uri])
+            
+        return command
+
+    def _execute_packager(self, command: List[str], output_dir: str) -> None:
+        logger.info(f"Executing Shaka Packager: {' '.join(command)}")
+        result = subprocess.run(command, cwd=output_dir, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error(f"Shaka Packager failed: {result.stderr}")
+            raise RuntimeError(f"Shaka Packager failed: {result.stderr}")
