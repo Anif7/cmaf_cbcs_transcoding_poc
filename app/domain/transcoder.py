@@ -19,6 +19,7 @@ class FFmpegTranscoder:
         self._execute_ffmpeg(command)
 
     def _execute_ffmpeg(self, command: list):
+        logger.info(f"Executing FFmpeg: {' '.join(command)}")
         try:
             subprocess.run(command, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as e:
