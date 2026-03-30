@@ -6,11 +6,11 @@ from typing import Dict, List
 logger = logging.getLogger(__name__)
 
 class ShakaPackager:
-    def package(self, transcoded_streams: List[Dict], output_dir: str, drm_config: Dict) -> None:
+    def package(self, video_streams: List[Dict], audio_path: str, output_dir: str, drm_config: Dict) -> None:
         logger.info(f"Starting packaging with DRM config: {drm_config}")
         os.makedirs(output_dir, exist_ok=True)
         
-        command = self._build_command(transcoded_streams, output_dir, drm_config)
+        command = self._build_command(video_streams, audio_path, output_dir, drm_config)
         self._execute_packager(command, output_dir)
 
     def _get_drm_params(self, drm_config: Dict) -> Dict:
@@ -19,46 +19,49 @@ class ShakaPackager:
         
         return {
             'key': widevine.get('key') or fairplay.get('key'),
-            'key_id': widevine.get('key_id') or widevine.get('content_id') or fairplay.get('content_id'),
+            'key_id': widevine.get('key_id'),
             'iv': fairplay.get('iv'),
             'uri': fairplay.get('uri')
         }
 
-    def _build_command(self, transcoded_streams: List[Dict], output_dir: str, drm_config: Dict) -> List[str]:
+    def _build_command(self, video_streams: List[Dict], audio_path: str, output_dir: str, drm_config: Dict) -> List[str]:
         drm = self._get_drm_params(drm_config)
         key, key_id, iv, key_uri = drm['key'], drm['key_id'], drm['iv'], drm['uri']
 
         command = ['packager']
         
+        # 🎧 AUDIO (single)
         audio_dir = os.path.join(output_dir, 'audio')
         os.makedirs(audio_dir, exist_ok=True)
-        highest_quality_stream = transcoded_streams[-1]['path']
-        
         command.append(
-            f"input={highest_quality_stream},"
+            f"input={audio_path},"
             f"stream=audio,"
             f"init_segment=audio/audio_init.mp4,"
             f"segment_template=audio/audio_$Number$.mp4,"
             f"playlist_name=audio/audio.m3u8,"
+            f"hls_group_id=audio,"
+            f"hls_name=ENGLISH,"
             f"drm_label=default"
         )
 
-        for stream in transcoded_streams:
+        # 🎥 VIDEO (multiple)
+        for stream in video_streams:
             path = stream['path']
-            res_name = stream['name']
+            name = stream['name']
             
-            res_dir = os.path.join(output_dir, res_name)
+            res_dir = os.path.join(output_dir, name)
             os.makedirs(res_dir, exist_ok=True)
 
             command.append(
                 f"input={path},"
                 f"stream=video,"
-                f"init_segment={res_name}/video_init.mp4,"
-                f"segment_template={res_name}/video_$Number$.mp4,"
-                f"playlist_name={res_name}/video.m3u8,"
+                f"init_segment={name}/video_init.mp4,"
+                f"segment_template={name}/video_$Number$.mp4,"
+                f"playlist_name={name}/video.m3u8,"
                 f"drm_label=default"
             )
 
+        # 🔐 DRM & Metadata
         command.extend([
             '--enable_raw_key_encryption',
             f'--keys=label=default:key_id={key_id}:key={key}',

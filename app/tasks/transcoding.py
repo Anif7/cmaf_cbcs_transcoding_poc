@@ -38,11 +38,15 @@ class VideoTranscodingTask(Task):
         logger.info(f"Step 1/4: Downloading source media for Job {job.id}")
         source_file = self.download_source_media(job, work_dir)
         
-        logger.info(f"Step 2/4: Transcoding Job {job.id}")
-        transcoded_streams = self.transcode_to_specified_formats(job, work_dir, source_file)
+        logger.info(f"Step 1.5: Extracting shared audio track")
+        audio_path = os.path.join(work_dir, "audio_track.mp4")
+        FFmpegTranscoder().extract_audio(source_file, audio_path)
+        
+        logger.info(f"Step 2/4: Transcoding video renditions")
+        video_streams = self.transcode_video_renditions(job, work_dir, source_file)
         
         logger.info(f"Step 3/4: Packaging Job {job.id} (Multi-DRM CMAF)")
-        self.package_transcoded_streams(job, work_dir, transcoded_streams)
+        self.package_content(job, work_dir, video_streams, audio_path)
         
         logger.info(f"Step 4/4: Uploading Job {job.id} to cloud storage")
         self.upload_final_artifacts(job, work_dir)
@@ -57,14 +61,14 @@ class VideoTranscodingTask(Task):
         MediaDownloader().download(job.input_url, source_file)
         return source_file
 
-    def transcode_to_specified_formats(self, job, work_dir, source_file):
+    def transcode_video_renditions(self, job, work_dir, source_file):
         job.update_status(TranscodingJob.Status.TRANSCODING)
         
         outputs = job.meta_data.get('settings', {}).get('outputs', [])
         if not outputs:
             outputs = [{'height': 360, 'width': 640, 'name': '360p'}]
             
-        transcoded_streams = []
+        video_streams = []
         transcoder = FFmpegTranscoder()
         for out in outputs:
             name = out.get('name') or f"{out['height']}p"
@@ -73,14 +77,18 @@ class VideoTranscodingTask(Task):
             
             out_file = os.path.join(work_dir, f"{name}.mp4")
             transcoder.transcode(source_file, out_file, width, height)
-            transcoded_streams.append({'path': out_file, 'name': name})
             
-        return transcoded_streams
+            video_streams.append({
+                'path': out_file, 
+                'name': name
+            })
+            
+        return video_streams
 
-    def package_transcoded_streams(self, job, work_dir, transcoded_streams):
+    def package_content(self, job, work_dir, video_streams, audio_path):
         job.update_status(TranscodingJob.Status.PACKAGING)
         output_dir = os.path.join(work_dir, 'packaged')
-        ShakaPackager().package(transcoded_streams, output_dir, job.drm_config)
+        ShakaPackager().package(video_streams, audio_path, output_dir, job.drm_config)
 
     def upload_final_artifacts(self, job, work_dir):
         job.update_status(TranscodingJob.Status.UPLOADING)
