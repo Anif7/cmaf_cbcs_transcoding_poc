@@ -15,6 +15,6 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Verify manifest generation (HLS/DASH) with sample renditions.
-- [ ] 3.2 Verify `cbcs` encryption flags in the generated artifacts.
-- [ ] 3.3 Verify subfolder organization and shared audio track reference.
+- [x] 3.1 Verify manifest generation (HLS/DASH) with sample renditions.
+- [x] 3.2 Verify `cbcs` encryption flags in the generated artifacts.
+- [x] 3.3 Verify subfolder organization and shared audio track reference.
