@@ -42,11 +42,11 @@ class VideoTranscodingTask(Task):
         audio_path = os.path.join(work_dir, "audio_track.mp4")
         FFmpegTranscoder().extract_audio(source_file, audio_path)
         
-        logger.info(f"Step 2/4: Transcoding video renditions")
-        video_streams = self.transcode_video_renditions(job, work_dir, source_file)
+        logger.info(f"Step 2/4: Transcoding video variants")
+        video_variants = self.transcode_video_variants(job, work_dir, source_file)
         
-        logger.info(f"Step 3/4: Packaging Job {job.id} (Multi-DRM CMAF)")
-        self.package_content(job, work_dir, video_streams, audio_path)
+        logger.info(f"Step 3/4: Packaging Job {job.id}")
+        self.package_content(job, work_dir, video_variants, audio_path)
         
         logger.info(f"Step 4/4: Uploading Job {job.id} to cloud storage")
         self.upload_final_artifacts(job, work_dir)
@@ -61,34 +61,37 @@ class VideoTranscodingTask(Task):
         MediaDownloader().download(job.input_url, source_file)
         return source_file
 
-    def transcode_video_renditions(self, job, work_dir, source_file):
+    def transcode_video_variants(self, job, work_dir, source_file):
         job.update_status(TranscodingJob.Status.TRANSCODING)
+        video_variants = self._extract_video_parameters(job, work_dir)
         
-        outputs = job.meta_data.get('settings', {}).get('outputs', [])
-        if not outputs:
-            outputs = [{'height': 360, 'width': 640, 'name': '360p'}]
-            
-        video_streams = []
-        transcoder = FFmpegTranscoder()
-        for out in outputs:
-            name = out.get('name') or f"{out['height']}p"
-            width = out.get('width', 640)
-            height = out.get('height', 360)
-            
-            out_file = os.path.join(work_dir, f"{name}.mp4")
-            transcoder.transcode(source_file, out_file, width, height)
-            
-            video_streams.append({
-                'path': out_file, 
-                'name': name
-            })
-            
-        return video_streams
+        logger.info(f"Triggering single-pass transcoding for {len(video_variants)} variants")
+        FFmpegTranscoder().transcode_video_variants(source_file, video_variants)
+        return video_variants
 
-    def package_content(self, job, work_dir, video_streams, audio_path):
+    def _extract_video_parameters(self, job: TranscodingJob, work_dir: str) -> list:
+        outputs = job.meta_data.get('settings', {}).get('outputs')
+        if not outputs:
+            logger.warning("No outputs found in metadata. Using fallback 360p.")
+            outputs = [{'video': {'width': 640, 'height': 360}, 'name': '360p'}]
+            
+        return [self._format_variant_config(output, work_dir) for output in outputs]
+
+    def _format_variant_config(self, output: dict, work_dir: str) -> dict:
+        video_config = output.get('video', {})
+        name = output['name']
+        return {
+            'path': os.path.join(work_dir, f"{name}.mp4"),
+            'name': name,
+            'width': video_config.get('width'),
+            'height': video_config.get('height'),
+            'video': video_config
+        }
+
+    def package_content(self, job, work_dir, video_variants, audio_path):
         job.update_status(TranscodingJob.Status.PACKAGING)
         output_dir = os.path.join(work_dir, 'packaged')
-        ShakaPackager().package(video_streams, audio_path, output_dir, job.drm_config)
+        ShakaPackager().package(video_variants, audio_path, output_dir, job.drm_config)
 
     def upload_final_artifacts(self, job, work_dir):
         job.update_status(TranscodingJob.Status.UPLOADING)
