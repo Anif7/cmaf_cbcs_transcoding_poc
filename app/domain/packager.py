@@ -37,8 +37,8 @@ class ShakaPackager:
         command.append(
             f"input={highest_quality_stream},"
             f"stream=audio,"
-            f"init_segment=audio/audio_init.m4s,"
-            f"segment_template=audio/audio_$Number$.m4s,"
+            f"init_segment=audio/audio_init.mp4,"
+            f"segment_template=audio/audio_$Number$.mp4,"
             f"playlist_name=audio/audio.m3u8,"
             f"drm_label=default"
         )
@@ -53,9 +53,9 @@ class ShakaPackager:
             command.append(
                 f"input={path},"
                 f"stream=video,"
-                f"init_segment={res_name}/video_init.m4s,"
-                f"segment_template={res_name}/video_$Number$.m4s,"
-                f"playlist_name={res_name}/video_v.m3u8,"
+                f"init_segment={res_name}/video_init.mp4,"
+                f"segment_template={res_name}/video_$Number$.mp4,"
+                f"playlist_name={res_name}/video.m3u8,"
                 f"drm_label=default"
             )
 
@@ -64,7 +64,7 @@ class ShakaPackager:
             f'--keys=label=default:key_id={key_id}:key={key}',
             '--protection_scheme', 'cbcs',
             '--protection_systems', 'Widevine,FairPlay',
-            '--segment_duration', '2',
+            '--segment_duration', '10',
             '--clear_lead', '0',
             '--hls_master_playlist_output', 'video.m3u8',
             '--hls_playlist_type', 'VOD',
