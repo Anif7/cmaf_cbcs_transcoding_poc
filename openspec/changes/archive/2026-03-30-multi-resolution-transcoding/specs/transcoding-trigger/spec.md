@@ -1,8 +1,5 @@
-# transcoding-trigger Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change implement-transcoding-trigger-view. Update Purpose after archive.
-## Requirements
 ### Requirement: Transcoding Trigger API Endpoint
 The system SHALL provide a POST API endpoint `/api/v1/transcode/trigger/` that accepts a JSON payload to initiate a transcoding job, supporting complex multi-resolution output configurations.
 
@@ -15,16 +12,3 @@ The system SHALL provide a POST API endpoint `/api/v1/transcode/trigger/` that a
 #### Scenario: Invalid payload
 - **WHEN** an invalid JSON payload is POSTed
 - **THEN** the system SHALL return a 400 Bad Request response with an error message
-
-### Requirement: Orchestration Pipeline
-The system SHALL execute a transcoding pipeline consisting of Download, Transcode, Package, and Upload steps.
-
-#### Scenario: Full pipeline execution
-- **WHEN** a job is triggered
-- **THEN** the system SHALL first download the source media
-- **THEN** the system SHALL transcode the media into specified formats
-- **THEN** the system SHALL package the transcoded streams (placeholder)
-- **THEN** the system SHALL upload the final artifacts (placeholder)
-- **THEN** the system SHALL update the job status at each step
-- **THEN** the system SHALL send a webhook notification upon completion or failure
-
