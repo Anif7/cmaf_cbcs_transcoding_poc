@@ -14,25 +14,26 @@ class ShakaPackager:
         command = self._build_command(stream_inputs, output_dir, drm_config)
         self._execute_packager(command, output_dir)
 
-    def _validate_drm_config(self, drm_config: Dict) -> None:
+    def _get_drm_params(self, drm_config: Dict) -> Dict:
         fairplay = drm_config.get('fairplay', {})
         widevine = drm_config.get('widevine', {})
         
-        key = fairplay.get('key') or widevine.get('key')
-        key_id = fairplay.get('content_id') or widevine.get('content_id')
-        
-        if not key or not key_id:
-            logger.error(f"Invalid DRM config. Key found: {bool(key)}, KeyID found: {bool(key_id)}")
-            raise ValueError("DRM configuration requires key and content_id (key_id)")
+        return {
+            'key': widevine.get('key') or fairplay.get('key'),
+            'key_id': widevine.get('key_id') or widevine.get('content_id') or fairplay.get('content_id'),
+            'iv': fairplay.get('iv'),
+            'uri': fairplay.get('uri')
+        }
+
+    def _validate_drm_config(self, drm_config: Dict) -> None:
+        params = self._get_drm_params(drm_config)
+        if not params['key'] or not params['key_id']:
+            logger.error(f"Invalid DRM config. Key found: {bool(params['key'])}, KeyID found: {bool(params['key_id'])}")
+            raise ValueError("DRM configuration requires both key and key_id")
 
     def _build_command(self, stream_inputs: List[Dict], output_dir: str, drm_config: Dict) -> List[str]:
-        fairplay = drm_config.get('fairplay', {})
-        widevine = drm_config.get('widevine', {})
-        
-        key = fairplay.get('key') or widevine.get('key')
-        key_id = fairplay.get('content_id') or widevine.get('content_id')
-        iv = fairplay.get('iv') or widevine.get('iv')
-        key_uri = fairplay.get('uri')
+        drm = self._get_drm_params(drm_config)
+        key, key_id, iv, key_uri = drm['key'], drm['key_id'], drm['iv'], drm['uri']
 
         command = ['packager']
         
@@ -73,7 +74,7 @@ class ShakaPackager:
             '--protection_scheme', 'cbcs',
             '--protection_systems', 'Widevine,FairPlay',
             '--segment_duration', '2',
-            '--clear_lead', '1',
+            '--clear_lead', '0',
             '--hls_master_playlist_output', 'video.m3u8',
             '--hls_playlist_type', 'VOD',
             '--mpd_output', 'video.mpd',
