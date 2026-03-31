@@ -68,7 +68,7 @@ class ShakaPackager:
             '--protection_scheme', 'cbcs',
             '--protection_systems', 'Widevine,FairPlay',
             '--segment_duration', '10',
-            '--clear_lead', '0',
+            '--clear_lead', '5',
             '--hls_master_playlist_output', 'video.m3u8',
             '--hls_playlist_type', 'VOD',
             '--mpd_output', 'video.mpd',
